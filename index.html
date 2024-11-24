@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MQTT Controller</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        .data-box {
+            border: 1px solid #ddd;
+            background: #f9f9f9;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+        }
+        .topic {
+            font-weight: bold;
+            color: #555;
+        }
+        .value {
+            font-size: 18px;
+            color: #222;
+        }
+        .controls {
+            margin-top: 10px;
+        }
+        button {
+            padding: 5px 10px;
+            margin-right: 5px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        button.off {
+            background-color: #f44336;
+        }
+        input[type="text"] {
+            padding: 5px;
+            margin-right: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <h1>MQTT Controller</h1>
+
+    <!-- Sensors/TempRoom -->
+    <div id="Sensors_TempRoom" class="data-box">
+        <span class="topic">Sensors/TempRoom:</span>
+        <span class="value" id="value_Sensors_TempRoom">Waiting...</span>
+    </div>
+
+    <!-- Controls/SAPCtrl -->
+    <div id="Controls_SAPCtrl" class="data-box">
+        <span class="topic">Controls/SAPCtrl:</span>
+        <span class="value" id="value_Controls_SAPCtrl">Waiting...</span>
+    </div>
+
+    <!-- Commands/SAPCmd -->
+    <div id="Commands_SAPCmd" class="data-box">
+        <span class="topic">Commands/SAPCmd:</span>
+        <span class="value" id="value_Commands_SAPCmd">Waiting...</span>
+    </div>
+
+    <!-- Setpoints/SATemp -->
+    <div id="Setpoints_SATemp" class="data-box">
+        <span class="topic">Setpoints/SATemp:</span>
+        <span class="value" id="value_Setpoints_SATemp">Waiting...</span>
+        <div class="controls">
+            <input type="text" id="input_Setpoints_SATemp" placeholder="Enter value..." />
+            <button onclick="sendSetpoint()">Set</button>
+        </div>
+    </div>
+
+    <!-- Commands/Fan -->
+    <div id="Commands_Fan" class="data-box">
+        <span class="topic">Commands/Fan:</span>
+        <span class="value" id="value_Commands_Fan">Waiting...</span>
+        <div class="controls">
+            <button onclick="sendCommand('Commands/Fan', 'ON')">Turn ON</button>
+            <button class="off" onclick="sendCommand('Commands/Fan', 'OFF')">Turn OFF</button>
+        </div>
+    </div>
+
+    <script>
+        // Thông tin kết nối đến HiveMQ Cloud
+        const brokerUrl = 'wss://fd873da0fa7248d3b85f7580f8543f7a.s1.eu.hivemq.cloud:8884/mqtt';
+        const options = {
+            username: 'Kettran',
+            password: 'Kettran123@',
+            connectTimeout: 5000,
+            clientId: `web_client_${Math.random().toString(16).substr(2, 8)}`,
+            clean: true
+        };
+
+        const client = mqtt.connect(brokerUrl, options);
+
+        client.on('connect', () => {
+            console.log('Connected to HiveMQ Cloud');
+
+            // Đăng ký các topic cần thiết
+            const topics = [
+                'Sensors/TempRoom',
+                'Controls/SAPCtrl',
+                'Commands/SAPCmd',
+                'Setpoints/SATemp',
+                'Commands/Fan'
+            ];
+            client.subscribe(topics, (err) => {
+                if (err) {
+                    console.error('Failed to subscribe:', err);
+                } else {
+                    console.log('Subscribed to topics:', topics.join(', '));
+                }
+            });
+        });
+
+        // Hiển thị dữ liệu từ MQTT Broker
+        client.on('message', (topic, message) => {
+            const value = message.toString();
+            console.log(`Received message: ${topic} -> ${value}`);
+
+            // Cập nhật giá trị dựa trên topic
+            switch (topic) {
+                case 'Sensors/TempRoom':
+                    document.getElementById('value_Sensors_TempRoom').textContent = value;
+                    break;
+                case 'Controls/SAPCtrl':
+                    document.getElementById('value_Controls_SAPCtrl').textContent = value;
+                    break;
+                case 'Commands/SAPCmd':
+                    document.getElementById('value_Commands_SAPCmd').textContent = value;
+                    break;
+                case 'Setpoints/SATemp':
+                    document.getElementById('value_Setpoints_SATemp').textContent = value;
+                    break;
+                case 'Commands/Fan':
+                    document.getElementById('value_Commands_Fan').textContent = value;
+                    break;
+            }
+        });
+
+        // Gửi lệnh điều khiển đến MQTT Broker
+        function sendCommand(topic, command) {
+            client.publish(topic, command);
+            console.log(`Sent command: ${command} to topic: ${topic}`);
+        }
+
+        // Gửi giá trị cài đặt cho Setpoints/SATemp
+        function sendSetpoint() {
+            const value = document.getElementById('input_Setpoints_SATemp').value.trim();
+            if (value) {
+                client.publish('Setpoints/SATemp', value);
+                console.log(`Sent setpoint: ${value} to topic: Setpoints/SATemp`);
+            } else {
+                alert('Please enter a valid value!');
+            }
+        }
+
+        // Xử lý lỗi
+        client.on('error', (err) => console.error('Connection error:', err));
+        client.on('reconnect', () => console.log('Reconnecting...'));
+        client.on('close', () => console.log('Connection closed.'));
+    </script>
+</body>
+</html>
